@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<AiEvaluationDefinition xmlns="http://soap.sforce.com/2006/04/metadata">
+    <name>OrderManagement Mini Test</name>
+    <subjectName>OrderManagement</subjectName>
+    <subjectType>AGENT</subjectType>
+    <subjectVersion>v1</subjectVersion>
+    <testCase>
+        <expectation>
+            <expectedValue>verification</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent asks for account number before looking up order status</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>Where is my order #12345?</utterance>
+        </inputs>
+        <number>1</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>verification</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent asks for account number before processing cancellation</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>I want to cancel my order 1234</utterance>
+        </inputs>
+        <number>2</number>
+    </testCase>
+    <testCase>
+        <expectation>
+            <expectedValue>verification</expectedValue>
+            <name>topic_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>[]</expectedValue>
+            <name>action_sequence_match</name>
+        </expectation>
+        <expectation>
+            <expectedValue>Agent asks for account number since no customer is verified</expectedValue>
+            <name>bot_response_rating</name>
+        </expectation>
+        <inputs>
+            <utterance>What&apos;s the order status?</utterance>
+        </inputs>
+        <number>3</number>
+    </testCase>
+</AiEvaluationDefinition>

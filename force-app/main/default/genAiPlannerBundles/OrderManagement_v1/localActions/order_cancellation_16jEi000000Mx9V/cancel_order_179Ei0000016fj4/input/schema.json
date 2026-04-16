@@ -1,0 +1,21 @@
+{
+  "required" : [ ],
+  "unevaluatedProperties" : false,
+  "properties" : {
+    "order_id" : {
+      "title" : "Order Id",
+      "description" : "The Salesforce record ID of the order to cancel",
+      "lightning:type" : "lightning__textType",
+      "lightning:isPII" : false,
+      "copilotAction:isUserInput" : false
+    },
+    "reason" : {
+      "title" : "Reason",
+      "description" : "The reason for cancelling the order",
+      "lightning:type" : "lightning__textType",
+      "lightning:isPII" : false,
+      "copilotAction:isUserInput" : false
+    }
+  },
+  "lightning:type" : "lightning__objectType"
+}
