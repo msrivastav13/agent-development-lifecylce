@@ -2,267 +2,269 @@
 # Agentforce Service agent for order management with customer verification,
 # order lookup, status tracking, and cancellation capabilities
 
+system:
+    messages:
+        welcome: "Welcome to Order Management! I can help you look up orders, check order status, and process cancellations. Let's start by verifying the customer."
+        error: "I encountered an issue processing your request. Please try again or contact your system administrator."
+    instructions: "You are an order management assistant. Always verify the customer by account number before performing any order operations. Be professional and concise."
+
 config:
-   agent_name: "OrderManagement"
-   agent_label: "Order Management"
-   agent_type: "AgentforceServiceAgent" # Use AgentforceEmployeeAgent for Employee Agent
-   description: "Order management agent that verifies customers by account number and provides order lookup, status tracking, and cancellation"
-   default_agent_user: "agentforce_service_agent@00dal00001mlely696195784.ext"
-      
+    developer_name: "OrderManagement"
+    agent_label: "Order Management"
+    agent_type: "AgentforceServiceAgent"
+    description: "Order management agent that verifies customers by account number and provides order lookup, status tracking, and cancellation"
+    default_agent_user: "ordermanagement@00dei00000jrsod740539182.ext"
 
 variables:
-   # Customer verification state
-   account_number: mutable string = ""
-      description: "The customer's account number used for verification"
-   customer_verified: mutable boolean = False
-      description: "Flag indicating if the customer has been verified"
-   customer_name: mutable string = ""
-      description: "Verified customer's full name"
-   customer_email: mutable string = ""
-      description: "Verified customer's email address"
-   customer_id: mutable string = ""
-      description: "Verified customer's Salesforce record ID"
+    # Customer verification state
+    account_number: mutable string = ""
+        description: "The customer's account number used for verification"
+    customer_verified: mutable boolean = False
+        description: "Flag indicating if the customer has been verified"
+    customer_name: mutable string = ""
+        description: "Verified customer's full name"
+    customer_email: mutable string = ""
+        description: "Verified customer's email address"
+    customer_id: mutable string = ""
+        description: "Verified customer's Salesforce record ID"
 
-   # Compliance state
-   compliance_checked: mutable boolean = False
-      description: "Flag indicating if account compliance has been verified"
-   compliance_status: mutable string = ""
-      description: "The compliance status message for the verified account"
-   risk_level: mutable string = ""
-      description: "The risk level of the verified account"
+    # Compliance state
+    compliance_checked: mutable boolean = False
+        description: "Flag indicating if account compliance has been verified"
+    compliance_status: mutable string = ""
+        description: "The compliance status message for the verified account"
+    risk_level: mutable string = ""
+        description: "The risk level of the verified account"
 
-   # Order state
-   order_number: mutable string = ""
-      description: "The human-readable order number"
-   order_count: mutable number = 0
-      description: "Number of orders found for the customer"
-   cancellation_confirmed: mutable boolean = False
-      description: "Flag indicating if an order cancellation was completed"
+    # Order state
+    order_number: mutable string = ""
+        description: "The human-readable order number"
+    order_count: mutable number = 0
+        description: "Number of orders found for the customer"
+    cancellation_confirmed: mutable boolean = False
+        description: "Flag indicating if an order cancellation was completed"
 
-system:
-   messages:
-      welcome: "Welcome to Order Management! I can help you look up orders, check order status, and process cancellations. Let's start by verifying the customer."
-      error: "I encountered an issue processing your request. Please try again or contact your system administrator."
-   instructions: "You are an order management assistant. Always verify the customer by account number before performing any order operations. Be professional and concise."
+start_agent topic_selector:
+    description: "Welcome users and determine their order management needs"
 
-start_agent agent_router:
-   description: "Welcome users and determine their order management needs"
+    reasoning:
+        instructions: |
+            Select the tool that best matches the user's message and conversation history. If it's unclear, make your best guess.
+        actions:
+            begin_verification: @utils.transition to @topic.verification
+                description: "Verify a customer by account number"
 
-   reasoning:
-      instructions:|
-         Select the tool that best matches the user's message and conversation history. If it's unclear, make your best guess.
-      actions:
-         begin_verification: @utils.transition to @subagent.verification
-            description: "Verify a customer by account number"
+            lookup_orders: @utils.transition to @topic.order_lookup
+                description: "Look up orders for the verified customer"
+                available when @variables.customer_verified
 
-         lookup_orders: @utils.transition to @subagent.order_lookup
-            description: "Look up orders for the verified customer"
-            available when @variables.customer_verified
+            check_status: @utils.transition to @topic.order_status
+                description: "Check detailed status for a specific order"
+                available when @variables.customer_verified
 
-         check_status: @utils.transition to @subagent.order_status
-            description: "Check detailed status for a specific order"
-            available when @variables.customer_verified
-
-         cancel_order: @utils.transition to @subagent.order_cancellation
-            description: "Cancel a specific order"
-            available when @variables.customer_verified
+            cancel_order: @utils.transition to @topic.order_cancellation
+                description: "Cancel a specific order"
+                available when @variables.customer_verified
 
 # Subagent 1: Customer Verification
-subagent verification:
-   description: "Verify the customer's identity using their account number before allowing order operations"
+topic verification:
+    description: "Verify the customer's identity using their account number before allowing order operations"
 
-   actions:
-      verify_customer:
-         description: "Verify a customer by their account number"
-         inputs:
-            account_number: string
-               description: "The customer's unique account number"
-         outputs:
-            success: boolean
-               description: "Whether the verification was successful"
-            customer_name: string
-               description: "The verified customer's full name"
-            customer_email: string
-               description: "The verified customer's email address"
-            customer_id: string
-               description: "The verified customer's Salesforce record ID"
-            error_message: string
-               description: "Error message if verification failed"
-         target: "apex://CustomerVerificationService"
+    reasoning:
+        instructions: ->
+            if @variables.customer_verified == False:
+                | Verify the customer using the {!@actions.verify} action.
+                  If the customer already provided their account number in the conversation,
+                  use it immediately with the verify action — do NOT ask for it again.
+                  If no account number was provided, ask for it.
+                  All order operations require a verified customer.
+            if @variables.customer_verified and @variables.compliance_checked == False:
+                run @actions.check_compliance
+                    with customer_id = @variables.customer_id
+                    set @variables.compliance_status = @outputs.compliance_status
+                    set @variables.risk_level = @outputs.risk_level
+                    set @variables.compliance_checked = @outputs.is_compliant
+            if @variables.customer_verified and @variables.compliance_checked:
+                | Customer verified: {!@variables.customer_name}
+                  Compliance: {!@variables.compliance_status} (Risk: {!@variables.risk_level})
+                  What would you like to do?
 
-      check_compliance:
-         description: "Check account compliance and standing for a verified customer"
-         inputs:
-            customer_id: string
-               description: "The Salesforce record ID of the verified customer"
-         outputs:
-            is_compliant: boolean
-               description: "Whether the account is in good standing"
-            compliance_status: string
-               description: "Human-readable compliance status message"
-            risk_level: string
-               description: "Account risk level: Low, Medium, or High"
-         target: "apex://AccountComplianceService"
+        actions:
+            verify: @actions.verify_customer
+                description: "Verify customer by account number"
+                available when @variables.customer_verified == False
+                with account_number = ...
+                set @variables.customer_verified = @outputs.success
+                set @variables.customer_name = @outputs.customer_name
+                set @variables.customer_email = @outputs.customer_email
+                set @variables.customer_id = @outputs.customer_id
 
-   reasoning:
-      instructions:->
-         if @variables.customer_verified == False:
-            | Ask the customer for their account number, then use the {!@actions.verify} action to verify their identity.
-            | All order operations require a verified customer.
-         if @variables.customer_verified and @variables.compliance_checked == False:
-            run @actions.check_compliance
-               with customer_id=@variables.customer_id
-               set @variables.compliance_status = @outputs.compliance_status
-               set @variables.risk_level = @outputs.risk_level
-               set @variables.compliance_checked = @outputs.is_compliant
-         if @variables.customer_verified and @variables.compliance_checked:
-            | Customer verified: {!@variables.customer_name}
-            | Compliance: {!@variables.compliance_status} (Risk: {!@variables.risk_level})
-            | What would you like to do?
+            go_to_orders: @utils.transition to @topic.order_lookup
+                description: "Proceed to look up customer orders"
+                available when @variables.compliance_checked
 
-      actions:
-         verify: @actions.verify_customer
-            description: "Verify customer by account number"
-            available when @variables.customer_verified == False
-            with account_number=...
-            set @variables.customer_verified = @outputs.success
-            set @variables.customer_name = @outputs.customer_name
-            set @variables.customer_email = @outputs.customer_email
-            set @variables.customer_id = @outputs.customer_id
+    after_reasoning:
+        if @variables.customer_verified and @variables.compliance_checked:
+            transition to @topic.order_lookup
 
-         go_to_orders: @utils.transition to @subagent.order_lookup
-            description: "Proceed to look up customer orders"
-            available when @variables.compliance_checked
+    actions:
+        verify_customer:
+            description: "Verify a customer by their account number"
+            inputs:
+                account_number: string
+                    description: "The customer's unique account number"
+            outputs:
+                success: boolean
+                    description: "Whether the verification was successful"
+                customer_name: string
+                    description: "The verified customer's full name"
+                customer_email: string
+                    description: "The verified customer's email address"
+                customer_id: string
+                    description: "The verified customer's Salesforce record ID"
+                error_message: string
+                    description: "Error message if verification failed"
+            target: "apex://CustomerVerificationService"
 
-   after_reasoning:
-      if @variables.customer_verified and @variables.compliance_checked:
-         transition to @subagent.order_lookup
+        check_compliance:
+            description: "Check account compliance and standing for a verified customer"
+            inputs:
+                customer_id: string
+                    description: "The Salesforce record ID of the verified customer"
+            outputs:
+                is_compliant: boolean
+                    description: "Whether the account is in good standing"
+                compliance_status: string
+                    description: "Human-readable compliance status message"
+                risk_level: string
+                    description: "Account risk level: Low, Medium, or High"
+            target: "apex://AccountComplianceService"
 
 # Subagent 2: Order Lookup
-subagent order_lookup:
-   description: "Look up and display orders for the verified customer"
+topic order_lookup:
+    description: "Look up and display orders for the verified customer"
 
-   actions:
-      get_orders:
-         description: "Retrieve orders for a customer by their Salesforce ID"
-         inputs:
-            customer_id: string
-               description: "The Salesforce record ID of the customer"
-         outputs:
-            success: boolean
-               description: "Whether the order lookup was successful"
-            order_count: object
-               description: "Total number of orders found"
-               complex_data_type_name: "lightning__integerType"
-            order_summary: string
-               description: "Formatted summary of the customer's orders"
-            error_message: string
-               description: "Error message if lookup failed"
-         target: "apex://OrderLookupService"
+    reasoning:
+        instructions: ->
+            | Customer: {!@variables.customer_name} (Account: {!@variables.account_number})
+            if @variables.order_count > 0:
+                | Found {!@variables.order_count} order(s) for this customer.
+                  You can check a specific order's status or cancel an order.
+            if @variables.order_count == 0:
+                | Looking up orders for this customer...
 
-   reasoning:
-      instructions:->
-         | Customer: {!@variables.customer_name} (Account: {!@variables.account_number})
-         if @variables.order_count > 0:
-            | Found {!@variables.order_count} order(s) for this customer.
-            | You can check a specific order's status or cancel an order.
-         if @variables.order_count == 0:
-            | Looking up orders for this customer...
+        actions:
+            lookup_orders: @actions.get_orders
+                description: "Fetch all orders for the verified customer"
+                with customer_id = @variables.customer_id
+                set @variables.order_count = @outputs.order_count
 
-      actions:
-         lookup_orders: @actions.get_orders
-            description: "Fetch all orders for the verified customer"
-            with customer_id=@variables.customer_id
-            set @variables.order_count = @outputs.order_count
+            check_status: @utils.transition to @topic.order_status
+                description: "Check detailed status for a specific order"
+                available when @variables.order_count > 0
 
-         check_status: @utils.transition to @subagent.order_status
-            description: "Check detailed status for a specific order"
-            available when @variables.order_count > 0
+            cancel_order: @utils.transition to @topic.order_cancellation
+                description: "Cancel a specific order"
+                available when @variables.order_count > 0
 
-         cancel_order: @utils.transition to @subagent.order_cancellation
-            description: "Cancel a specific order"
-            available when @variables.order_count > 0
+            verify_different: @utils.transition to @topic.verification
+                description: "Verify a different customer"
 
-         verify_different: @utils.transition to @subagent.verification
-            description: "Verify a different customer"
+    actions:
+        get_orders:
+            description: "Retrieve orders for a customer by their Salesforce ID"
+            inputs:
+                customer_id: string
+                    description: "The Salesforce record ID of the customer"
+            outputs:
+                success: boolean
+                    description: "Whether the order lookup was successful"
+                order_count: object
+                    description: "Total number of orders found"
+                    complex_data_type_name: "lightning__integerType"
+                order_summary: string
+                    description: "Formatted summary of the customer's orders"
+                error_message: string
+                    description: "Error message if lookup failed"
+            target: "apex://OrderLookupService"
 
 # Subagent 3: Order Status
-subagent order_status:
-   description: "Display detailed status information for a specific order"
+topic order_status:
+    description: "Display detailed status information for a specific order"
 
-   actions:
-      get_orders:
-         description: "Retrieve orders for a customer to check status"
-         inputs:
-            customer_id: string
-               description: "The Salesforce record ID of the customer"
-         outputs:
-            success: boolean
-               description: "Whether the order lookup was successful"
-            order_count: object
-               description: "Total number of orders found"
-               complex_data_type_name: "lightning__integerType"
-            order_summary: string
-               description: "Formatted summary of the customer's orders"
-            error_message: string
-               description: "Error message if lookup failed"
-         target: "apex://OrderLookupService"
+    reasoning:
+        instructions: ->
+            | Customer: {!@variables.customer_name}
+              Ask which order the user wants to check status for.
+              Display the detailed status information from the order summary.
 
-   reasoning:
-      instructions:->
-         | Customer: {!@variables.customer_name}
-         | Ask which order the user wants to check status for.
-         | Display the detailed status information from the order summary.
+        actions:
+            refresh_orders: @actions.get_orders
+                description: "Refresh order data to show current status"
+                with customer_id = @variables.customer_id
+                set @variables.order_count = @outputs.order_count
 
-      actions:
-         refresh_orders: @actions.get_orders
-            description: "Refresh order data to show current status"
-            with customer_id=@variables.customer_id
-            set @variables.order_count = @outputs.order_count
+            go_back: @utils.transition to @topic.order_lookup
+                description: "Go back to the order list"
 
-         go_back: @utils.transition to @subagent.order_lookup
-            description: "Go back to the order list"
+            cancel_order: @utils.transition to @topic.order_cancellation
+                description: "Cancel this order instead"
 
-         cancel_order: @utils.transition to @subagent.order_cancellation
-            description: "Cancel this order instead"
+    actions:
+        get_orders:
+            description: "Retrieve orders for a customer to check status"
+            inputs:
+                customer_id: string
+                    description: "The Salesforce record ID of the customer"
+            outputs:
+                success: boolean
+                    description: "Whether the order lookup was successful"
+                order_count: object
+                    description: "Total number of orders found"
+                    complex_data_type_name: "lightning__integerType"
+                order_summary: string
+                    description: "Formatted summary of the customer's orders"
+                error_message: string
+                    description: "Error message if lookup failed"
+            target: "apex://OrderLookupService"
 
 # Subagent 4: Order Cancellation
-subagent order_cancellation:
-   description: "Process cancellation for a specific order after confirmation"
+topic order_cancellation:
+    description: "Process cancellation for a specific order after confirmation"
 
-   actions:
-      cancel_order:
-         description: "Cancel a specific order by order ID"
-         inputs:
-            order_id: string
-               description: "The Salesforce record ID of the order to cancel"
-            reason: string
-               description: "The reason for cancelling the order"
-         outputs:
-            success: boolean
-               description: "Whether the cancellation was successful"
-            cancelled_order_number: string
-               description: "The order number of the cancelled order"
-            error_message: string
-               description: "Error message if cancellation failed"
-         target: "apex://OrderCancellationService"
+    reasoning:
+        instructions: ->
+            | Customer: {!@variables.customer_name}
+            if @variables.cancellation_confirmed == False:
+                | Which order would the user like to cancel? Ask for the order number and reason.
+                  Confirm with the user before proceeding with cancellation.
+            if @variables.cancellation_confirmed:
+                | The order has been cancelled successfully.
 
-   reasoning:
-      instructions:->
-         | Customer: {!@variables.customer_name}
-         if @variables.cancellation_confirmed == False:
-            | Which order would the user like to cancel? Ask for the order number and reason.
-            | Confirm with the user before proceeding with cancellation.
-         if @variables.cancellation_confirmed:
-            | The order has been cancelled successfully.
+        actions:
+            process_cancellation: @actions.cancel_order
+                description: "Execute the order cancellation"
+                with order_id = ...
+                with reason = ...
+                set @variables.cancellation_confirmed = @outputs.success
+                set @variables.order_number = @outputs.cancelled_order_number
 
-      actions:
-         process_cancellation: @actions.cancel_order
-            description: "Execute the order cancellation"
-            with order_id=...
-            with reason=...
-            set @variables.cancellation_confirmed = @outputs.success
-            set @variables.order_number = @outputs.cancelled_order_number
+            go_back: @utils.transition to @topic.order_lookup
+                description: "Return to order list"
 
-         go_back: @utils.transition to @subagent.order_lookup
-            description: "Return to order list"
+    actions:
+        cancel_order:
+            description: "Cancel a specific order by order ID"
+            inputs:
+                order_id: string
+                    description: "The Salesforce record ID of the order to cancel"
+                reason: string
+                    description: "The reason for cancelling the order"
+            outputs:
+                success: boolean
+                    description: "Whether the cancellation was successful"
+                cancelled_order_number: string
+                    description: "The order number of the cancelled order"
+                error_message: string
+                    description: "Error message if cancellation failed"
+            target: "apex://OrderCancellationService"
