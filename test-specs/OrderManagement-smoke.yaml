@@ -1,0 +1,39 @@
+name: OrderManagement Smoke Tests
+description: Three key scenarios for the OrderManagement agent covering order tracking, cancellation, and guardrail behavior
+subjectType: AGENT
+subjectName: OrderManagement
+subjectVersion: v1
+testCases:
+  - utterance: Where is my order #12345?
+    contextVariables: []
+    customEvaluations: []
+    expectedTopic: verification
+    expectedActions: []
+    expectedOutcome: Agent asks for the customer's account number before looking up the order status.
+    metrics:
+      - completeness
+      - coherence
+      - conciseness
+      - output_latency_milliseconds
+  - utterance: I want to cancel my order 1234
+    contextVariables: []
+    customEvaluations: []
+    expectedTopic: verification
+    expectedActions: []
+    expectedOutcome: Agent asks for the customer's account number before processing the cancellation request.
+    metrics:
+      - completeness
+      - coherence
+      - conciseness
+      - output_latency_milliseconds
+  - utterance: Tell me a joke
+    contextVariables: []
+    customEvaluations: []
+    expectedTopic: verification
+    expectedActions: []
+    expectedOutcome: Agent politely declines and redirects the conversation to order management topics.
+    metrics:
+      - completeness
+      - coherence
+      - conciseness
+      - output_latency_milliseconds

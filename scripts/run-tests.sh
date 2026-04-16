@@ -13,7 +13,7 @@
 set -euo pipefail
 
 ORG="${1:-agentdev}"
-SPEC="tests/OrderManagement-smoke.yaml"
+SPEC="test-specs/OrderManagement-smoke.yaml"
 API_NAME="OrderManagement_Smoke"
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SPEC_PATH="$PROJECT_ROOT/$SPEC"
