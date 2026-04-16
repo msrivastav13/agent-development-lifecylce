@@ -45,30 +45,30 @@ system:
       error: "I encountered an issue processing your request. Please try again or contact your system administrator."
    instructions: "You are an order management assistant. Always verify the customer by account number before performing any order operations. Be professional and concise."
 
-start_agent topic_selector:
+start_agent agent_router:
    description: "Welcome users and determine their order management needs"
 
    reasoning:
       instructions:|
          Select the tool that best matches the user's message and conversation history. If it's unclear, make your best guess.
       actions:
-         begin_verification: @utils.transition to @topic.verification
+         begin_verification: @utils.transition to @subagent.verification
             description: "Verify a customer by account number"
 
-         lookup_orders: @utils.transition to @topic.order_lookup
+         lookup_orders: @utils.transition to @subagent.order_lookup
             description: "Look up orders for the verified customer"
             available when @variables.customer_verified
 
-         check_status: @utils.transition to @topic.order_status
+         check_status: @utils.transition to @subagent.order_status
             description: "Check detailed status for a specific order"
             available when @variables.customer_verified
 
-         cancel_order: @utils.transition to @topic.order_cancellation
+         cancel_order: @utils.transition to @subagent.order_cancellation
             description: "Cancel a specific order"
             available when @variables.customer_verified
 
-# TOPIC 1: Customer Verification
-topic verification:
+# Subagent 1: Customer Verification
+subagent verification:
    description: "Verify the customer's identity using their account number before allowing order operations"
 
    actions:
@@ -130,16 +130,16 @@ topic verification:
             set @variables.customer_email = @outputs.customer_email
             set @variables.customer_id = @outputs.customer_id
 
-         go_to_orders: @utils.transition to @topic.order_lookup
+         go_to_orders: @utils.transition to @subagent.order_lookup
             description: "Proceed to look up customer orders"
             available when @variables.compliance_checked
 
    after_reasoning:
       if @variables.customer_verified and @variables.compliance_checked:
-         transition to @topic.order_lookup
+         transition to @subagent.order_lookup
 
-# TOPIC 2: Order Lookup
-topic order_lookup:
+# Subagent 2: Order Lookup
+subagent order_lookup:
    description: "Look up and display orders for the verified customer"
 
    actions:
@@ -175,19 +175,19 @@ topic order_lookup:
             with customer_id=@variables.customer_id
             set @variables.order_count = @outputs.order_count
 
-         check_status: @utils.transition to @topic.order_status
+         check_status: @utils.transition to @subagent.order_status
             description: "Check detailed status for a specific order"
             available when @variables.order_count > 0
 
-         cancel_order: @utils.transition to @topic.order_cancellation
+         cancel_order: @utils.transition to @subagent.order_cancellation
             description: "Cancel a specific order"
             available when @variables.order_count > 0
 
-         verify_different: @utils.transition to @topic.verification
+         verify_different: @utils.transition to @subagent.verification
             description: "Verify a different customer"
 
-# TOPIC 3: Order Status
-topic order_status:
+# Subagent 3: Order Status
+subagent order_status:
    description: "Display detailed status information for a specific order"
 
    actions:
@@ -220,14 +220,14 @@ topic order_status:
             with customer_id=@variables.customer_id
             set @variables.order_count = @outputs.order_count
 
-         go_back: @utils.transition to @topic.order_lookup
+         go_back: @utils.transition to @subagent.order_lookup
             description: "Go back to the order list"
 
-         cancel_order: @utils.transition to @topic.order_cancellation
+         cancel_order: @utils.transition to @subagent.order_cancellation
             description: "Cancel this order instead"
 
-# TOPIC 4: Order Cancellation
-topic order_cancellation:
+# Subagent 4: Order Cancellation
+subagent order_cancellation:
    description: "Process cancellation for a specific order after confirmation"
 
    actions:
@@ -264,5 +264,5 @@ topic order_cancellation:
             set @variables.cancellation_confirmed = @outputs.success
             set @variables.order_number = @outputs.cancelled_order_number
 
-         go_back: @utils.transition to @topic.order_lookup
+         go_back: @utils.transition to @subagent.order_lookup
             description: "Return to order list"
